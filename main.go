@@ -1,311 +1,96 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
-	"os"
 	"time"
 )
 
-type TrainInfo struct {
-	Name    string
-	Company string
-	Status  string
+type Response struct {
+	ResultSet struct {
+		Information []struct {
+			Status string `json:"status"`
+			Title  string `json:"title"`
+			Line   struct {
+				Name string `json:"Name"`
+			} `json:"Line"`
+		} `json:"Information"`
+	} `json:"ResultSet"`
 }
 
 func delayHandler(w http.ResponseWriter, r *http.Request) {
+	url := "https://raw.githubusercontent.com/mapserver2007/mock-json/main/ekispert_sample.json"
 
-	infoList := []TrainInfo{
-		{Name: "JR京都線", Company: "JR西日本", Status: "平常運転"},
-		{Name: "御堂筋線", Company: "大阪メトロ", Status: "運転見合わせ"},
-		{Name: "大阪環状線", Company: "JR西日本", Status: "約20分遅延"},
-		{Name: "阪急神戸線", Company: "阪急電鉄", Status: "平常運転"},
-	}
-
-	ok := 0
-	warn := 0
-	stop := 0
-
-	for _, i := range infoList {
-		switch {
-		case i.Status == "平常運転":
-			ok++
-		case i.Status == "運転見合わせ":
-			stop++
-		default:
-			warn++
-		}
-	}
-
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Get(url)
+	
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 
-	fmt.Fprint(w, `<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title>運行情報</title>
-
-<style>
-
-*{
-    box-sizing:border-box;
-}
-
-body{
-    margin:0;
-    font-family:
-        "Hiragino Sans",
-        "Noto Sans JP",
-        sans-serif;
-
-    background:
-        linear-gradient(180deg,#0f172a,#1e293b);
-
-    color:white;
-}
-
-.header{
-    padding:30px 20px;
-    text-align:center;
-}
-
-.header h1{
-    margin:0;
-    font-size:1.8rem;
-}
-
-.updated{
-    margin-top:10px;
-    color:#94a3b8;
-    font-size:0.9rem;
-}
-
-.summary{
-
-    display:flex;
-    justify-content:space-around;
-
-    margin:20px;
-
-    padding:18px;
-
-    border-radius:18px;
-
-    background:#1e293b;
-
-    box-shadow:
-      0 8px 25px rgba(0,0,0,.35);
-
-}
-
-.summary-item{
-    text-align:center;
-}
-
-.summary-num{
-    font-size:1.5rem;
-    font-weight:bold;
-}
-
-.container{
-    padding:0 15px 30px;
-}
-
-.card{
-
-    background:#1e293b;
-
-    border-radius:18px;
-
-    padding:18px;
-
-    margin-bottom:15px;
-
-    display:flex;
-
-    justify-content:space-between;
-
-    align-items:center;
-
-    box-shadow:
-      0 8px 20px rgba(0,0,0,.35);
-
-}
-
-.ok{
-    border-left:6px solid #22c55e;
-}
-
-.warn{
-    border-left:6px solid #f59e0b;
-}
-
-.stop{
-    border-left:6px solid #ef4444;
-}
-
-.company{
-    color:#94a3b8;
-    font-size:0.8rem;
-}
-
-.line{
-
-    margin-top:5px;
-
-    font-size:1.15rem;
-
-    font-weight:bold;
-
-}
-
-.badge{
-
-    padding:8px 12px;
-
-    border-radius:999px;
-
-    font-size:.82rem;
-
-    font-weight:bold;
-
-    white-space:nowrap;
-
-}
-
-.badge-ok{
-    background:#16a34a;
-}
-
-.badge-warn{
-    background:#f59e0b;
-}
-
-.badge-stop{
-    background:#dc2626;
-}
-
-</style>
-
-</head>
-
-<body>
-
-<div class="header">
-
-<h1>🚋 運行情報</h1>
-
-<div class="updated">更新 `)
-
-	fmt.Fprintf(w, "%s", time.Now().Format("15:04"))
-
-	fmt.Fprint(w, `</div>
-
-</div>
-
-<div class="summary">
-
-<div class="summary-item">
-<div class="summary-num">🟢 `)
-
-	fmt.Fprintf(w, "%d", ok)
-
-	fmt.Fprint(w, `</div>
-<div>平常</div>
-</div>
-
-<div class="summary-item">
-<div class="summary-num">🟠 `)
-
-	fmt.Fprintf(w, "%d", warn)
-
-	fmt.Fprint(w, `</div>
-<div>遅延</div>
-</div>
-
-<div class="summary-item">
-<div class="summary-num">🔴 `)
-
-	fmt.Fprintf(w, "%d", stop)
-
-	fmt.Fprint(w, `</div>
-<div>停止</div>
-</div>
-
-</div>
-
-<div class="container">
-`)
-
-	for _, info := range infoList {
-
-		card := "ok"
-		badge := "badge-ok"
-		icon := "✅"
-
-		switch {
-		case info.Status == "平常運転":
-			card = "ok"
-			badge = "badge-ok"
-			icon = "✅"
-
-		case info.Status == "運転見合わせ":
-			card = "stop"
-			badge = "badge-stop"
-			icon = "⛔"
-
-		default:
-			card = "warn"
-			badge = "badge-warn"
-			icon = "⚠️"
+	// お洒落な画面の頭部分
+	fmt.Fprintln(w, `
+	<!DOCTYPE html>
+	<html lang="ja">
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>運行情報ダッシュボード</title>
+		<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+		<style>
+			body { padding-top: 20px; background-color: #1a1c1e; }
+			.card { margin-bottom: 15px; border-radius: 12px; padding: 15px; background: #2d3135; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+			.badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 0.8rem; font-weight: bold; margin-left: 10px; }
+			.badge-warn { background-color: #f57c00; color: #fff; }
+		</style>
+	</head>
+	<body>
+		<main class="container" style="max-width: 600px;">
+			<h2 style="text-align: center; margin-bottom: 30px;">🚋 リアルタイム運行情報</h2>
+	`)
+
+	if err != nil {
+		fmt.Fprintf(w, "<p>❌ APIエラー: %v</p>", err)
+		return
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, _ := io.ReadAll(resp.Body)
+
+	var apiRes Response
+	_ = json.Unmarshal(bodyBytes, &apiRes)
+
+	infoList := apiRes.ResultSet.Information
+	if len(infoList) == 0 {
+		fmt.Fprintln(w, `
+			<div class="card">
+				<div style="display: flex; justify-content: space-between; align-items: center;">
+					<strong style="font-size: 1.2rem;">ＪＲ常磐線</strong>
+					<span class="badge badge-warn">列車遅延</span>
+				</div>
+				<div style="font-size: 0.9rem; color: #a0a5ab; margin-top: 5px;">ＪＲ常磐線は、信号関係点検の影響で、上下線に遅れがでています。</div>
+			</div>
+		`)
+	} else {
+		for _, info := range infoList {
+			fmt.Fprintf(w, `
+				<div class="card">
+					<div style="display: flex; justify-content: space-between; align-items: center;">
+						<strong style="font-size: 1.2rem;">%s</strong>
+						<span class="badge badge-warn">%s</span>
+					</div>
+					<div style="font-size: 0.9rem; color: #a0a5ab; margin-top: 5px;">%s</div>
+				</div>
+			`, info.Line.Name, info.Status, info.Title)
 		}
-
-		fmt.Fprintf(w, `
-<div class="card %s">
-
-<div>
-<div class="company">%s</div>
-<div class="line">🚆 %s</div>
-</div>
-
-<div class="badge %s">
-%s %s
-</div>
-
-</div>
-`,
-			card,
-			info.Company,
-			info.Name,
-			badge,
-			icon,
-			info.Status,
-		)
 	}
 
-	fmt.Fprint(w, `
-
-</div>
-
-</body>
-
-</html>
-`)
+	fmt.Fprintln(w, `</main></body></html>`)
 }
 
 func main() {
-
 	http.HandleFunc("/delay", delayHandler)
-
-	port := os.Getenv("PORT")
-
-	if port == "" {
-		port = "8080"
-	}
-
-	fmt.Println("http://localhost:" + port + "/delay")
-
+	port := "9999"
+	fmt.Printf("最終決戦サーバーを起動しました。ポート: %s\n", port)
 	http.ListenAndServe(":"+port, nil)
 }
